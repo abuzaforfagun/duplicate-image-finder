@@ -5,6 +5,7 @@ import (
 	"crypto/sha256"
 	"image"
 	"image/jpeg"
+	"image/png"
 	"log"
 	"os"
 	"strings"
@@ -12,7 +13,7 @@ import (
 
 func main() {
 	dirName := "./images"
-	files, err := getImageFiles(dirName)
+	jpegFiles, pngFiles, err := getImageFiles(dirName)
 	if err != nil {
 		log.Panicf("%v", err)
 		return
@@ -21,7 +22,7 @@ func main() {
 	filesMap := map[[32]byte]string{}
 	duplicatedFiles := []string{}
 
-	for _, filename := range files {
+	for _, filename := range jpegFiles {
 		file, err := os.Open(dirName + "/" + filename)
 		if err != nil {
 			log.Printf("Unable to open [filename=%s][Err=%v]\n", filename, err)
@@ -48,31 +49,60 @@ func main() {
 		filesMap[hash] = filename
 	}
 
+	for _, filename := range pngFiles {
+		file, err := os.Open(dirName + "/" + filename)
+		if err != nil {
+			log.Printf("Unable to open [filename=%s][Err=%v]\n", filename, err)
+			return
+		}
+
+		image, _, err := image.Decode(file)
+		if err != nil {
+			log.Printf("Unable to decode [filename=%s][Err=%v]\n", filename, err)
+			return
+		}
+
+		var buffer bytes.Buffer
+		png.Encode(&buffer, image)
+		hash := sha256.Sum256(buffer.Bytes())
+
+		existingFile := filesMap[hash]
+		if existingFile != "" {
+			duplicatedFiles = append(duplicatedFiles, filename)
+			continue
+		}
+		filesMap[hash] = filename
+	}
+
 	log.Println(duplicatedFiles)
 
 }
 
-func getImageFiles(dirPath string) ([]string, error) {
+func getImageFiles(dirPath string) ([]string, []string, error) {
 	files, err := os.ReadDir(dirPath)
 
 	if err != nil {
 		log.Println("unable to retrieve files", err)
-		return nil, err
+		return nil, nil, err
 	}
 
-	result := []string{}
+	jpegImages := []string{}
+	pngImages := []string{}
 	for _, file := range files {
 		if file.IsDir() {
 			continue
 		}
 
 		isJpgFile := strings.HasSuffix(file.Name(), "jpg") || strings.HasSuffix(file.Name(), "jpeg")
-		if !isJpgFile {
-			continue
+		isPngFile := strings.HasSuffix(file.Name(), "png")
+		if isJpgFile {
+			jpegImages = append(jpegImages, file.Name())
 		}
 
-		result = append(result, file.Name())
+		if isPngFile {
+			pngImages = append(pngImages, file.Name())
+		}
 	}
 
-	return result, nil
+	return jpegImages, pngImages, nil
 }
