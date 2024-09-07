@@ -8,12 +8,13 @@ import (
 	"image/png"
 	"log"
 	"os"
+	"path/filepath"
 	"strings"
 )
 
 func main() {
 	dirName := "./images"
-	jpegFiles, pngFiles, err := getImageFiles(dirName)
+	images, err := getImageFiles(dirName)
 	if err != nil {
 		log.Panicf("%v", err)
 		return
@@ -22,72 +23,52 @@ func main() {
 	filesMap := map[[32]byte]string{}
 	duplicatedFiles := []string{}
 
-	for _, filename := range jpegFiles {
-		file, err := os.Open(dirName + "/" + filename)
+	for _, filename := range images {
+		file, err := os.Open(filepath.Join(dirName, filename.Name))
 		if err != nil {
-			log.Printf("Unable to open [filename=%s][Err=%v]\n", filename, err)
+			log.Printf("Unable to open [filename=%s][Err=%v]\n", filename.Name, err)
 			return
 		}
 
 		image, _, err := image.Decode(file)
 		if err != nil {
-			log.Printf("Unable to decode [filename=%s][Err=%v]\n", filename, err)
+			log.Printf("Unable to decode [filename=%s][Err=%v]\n", filename.Name, err)
 			return
 		}
 
 		var buffer bytes.Buffer
-		jpeg.Encode(&buffer, image, &jpeg.Options{
-			Quality: 5,
-		})
+		if filename.Type == JPG {
+			jpeg.Encode(&buffer, image, &jpeg.Options{
+				Quality: 5,
+			})
+		}
+
+		if filename.Type == PNG {
+			png.Encode(&buffer, image)
+		}
 		hash := sha256.Sum256(buffer.Bytes())
 
 		existingFile := filesMap[hash]
 		if existingFile != "" {
-			duplicatedFiles = append(duplicatedFiles, filename)
+			duplicatedFiles = append(duplicatedFiles, filename.Name)
 			continue
 		}
-		filesMap[hash] = filename
-	}
-
-	for _, filename := range pngFiles {
-		file, err := os.Open(dirName + "/" + filename)
-		if err != nil {
-			log.Printf("Unable to open [filename=%s][Err=%v]\n", filename, err)
-			return
-		}
-
-		image, _, err := image.Decode(file)
-		if err != nil {
-			log.Printf("Unable to decode [filename=%s][Err=%v]\n", filename, err)
-			return
-		}
-
-		var buffer bytes.Buffer
-		png.Encode(&buffer, image)
-		hash := sha256.Sum256(buffer.Bytes())
-
-		existingFile := filesMap[hash]
-		if existingFile != "" {
-			duplicatedFiles = append(duplicatedFiles, filename)
-			continue
-		}
-		filesMap[hash] = filename
+		filesMap[hash] = filename.Name
 	}
 
 	log.Println(duplicatedFiles)
 
 }
 
-func getImageFiles(dirPath string) ([]string, []string, error) {
+func getImageFiles(dirPath string) ([]*ImageFile, error) {
 	files, err := os.ReadDir(dirPath)
 
 	if err != nil {
 		log.Println("unable to retrieve files", err)
-		return nil, nil, err
+		return nil, err
 	}
 
-	jpegImages := []string{}
-	pngImages := []string{}
+	images := []*ImageFile{}
 	for _, file := range files {
 		if file.IsDir() {
 			continue
@@ -96,13 +77,13 @@ func getImageFiles(dirPath string) ([]string, []string, error) {
 		isJpgFile := strings.HasSuffix(file.Name(), "jpg") || strings.HasSuffix(file.Name(), "jpeg")
 		isPngFile := strings.HasSuffix(file.Name(), "png")
 		if isJpgFile {
-			jpegImages = append(jpegImages, file.Name())
+			images = append(images, NewJpegImage(file.Name()))
 		}
 
 		if isPngFile {
-			pngImages = append(pngImages, file.Name())
+			images = append(images, NewPngImage(file.Name()))
 		}
 	}
 
-	return jpegImages, pngImages, nil
+	return images, nil
 }
