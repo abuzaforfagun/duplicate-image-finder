@@ -33,9 +33,14 @@ cd duplicate-image-finder
 
 ## How to Run
 
+_Option 1:_
 To run the program from your terminal: `go run . "{YOUR FOLDER PATH}"`
 Replace {YOUR FOLDER PATH} with the path to the folder you want to scan for duplicate images.
 For example: `go run . "C:\Personal Interest\Golang\duplicate-image-finder\images"`
+
+_Option 2:_
+Install the program from your terminal: `go install`
+Open the terminal from the folder that need to be checked, and run `duplicate-image-finder`.
 
 ## Contribution
 
