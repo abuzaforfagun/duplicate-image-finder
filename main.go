@@ -20,17 +20,20 @@ func main() {
 	}
 	log.Println("Folder name: ", os.Args[1])
 	start := time.Now()
-	findDuplicateImageAsync(os.Args[1])
-	// findDuplicateImageSync(os.Args[1])
+	duplicatedFiles := findDuplicateImageAsync(os.Args[1])
+	for _, file := range duplicatedFiles {
+		log.Println(file)
+	}
+	//duplicatedFiles :=  findDuplicateImageSync(os.Args[1])
 	duration := time.Since(start)
 	log.Printf("IT takes %f seconds", duration.Seconds())
 }
 
-func findDuplicateImageAsync(folderPath string) {
-	images, err := getImageFilesAsync(folderPath)
+func findDuplicateImageAsync(folderPath string) []string {
+	files, err := getImageFilesAsync(folderPath)
 	if err != nil {
 		log.Panicf("%v", err)
-		return
+		return nil
 	}
 
 	filesMap := map[[32]byte]string{}
@@ -38,11 +41,11 @@ func findDuplicateImageAsync(folderPath string) {
 
 	var wg sync.WaitGroup
 	var mutex sync.Mutex
-	for _, filename := range images {
+	for _, filename := range files {
 		wg.Add(1)
 		go func(fileName *ImageFile) {
 			defer wg.Done()
-			file, err := os.Open(filepath.Join(folderPath, filename.Name))
+			file, err := os.Open(filename.Name)
 			if err != nil {
 				log.Printf("Unable to open [filename=%s][Err=%v]\n", filename.Name, err)
 				return
@@ -80,15 +83,14 @@ func findDuplicateImageAsync(folderPath string) {
 
 	}
 	wg.Wait()
-
-	log.Println(duplicatedFiles)
+	return duplicatedFiles
 }
 
-func findDuplicateImageSync(folderPath string) {
+func findDuplicateImageSync(folderPath string) []string {
 	images, err := getImageFiles(folderPath)
 	if err != nil {
 		log.Panicf("%v", err)
-		return
+		return nil
 	}
 
 	filesMap := map[[32]byte]string{}
@@ -98,13 +100,13 @@ func findDuplicateImageSync(folderPath string) {
 		file, err := os.Open(filepath.Join(folderPath, filename.Name))
 		if err != nil {
 			log.Printf("Unable to open [filename=%s][Err=%v]\n", filename.Name, err)
-			return
+			return nil
 		}
 
 		image, _, err := image.Decode(file)
 		if err != nil {
 			log.Printf("Unable to decode [filename=%s][Err=%v]\n", filename.Name, err)
-			return
+			return nil
 		}
 
 		var buffer bytes.Buffer
@@ -127,7 +129,7 @@ func findDuplicateImageSync(folderPath string) {
 		filesMap[hash] = filename.Name
 	}
 
-	log.Println(duplicatedFiles)
+	return duplicatedFiles
 }
 
 func getImageFiles(dirPath string) ([]*ImageFile, error) {
@@ -180,15 +182,13 @@ func getImageFilesAsync(dirPath string) ([]*ImageFile, error) {
 
 			isJpgFile := strings.HasSuffix(file.Name(), "jpg") || strings.HasSuffix(file.Name(), "jpeg")
 			isPngFile := strings.HasSuffix(file.Name(), "png")
+			imagePath := filepath.Join(dirPath, file.Name())
 			if isJpgFile {
-				// images = append(images, NewJpegImage(file.Name()))
-				imageChan <- NewJpegImage(file.Name())
+				imageChan <- NewJpegImage(imagePath)
 			}
 
 			if isPngFile {
-
-				// images = append(images, NewPngImage(file.Name()))
-				imageChan <- NewPngImage(file.Name())
+				imageChan <- NewPngImage(imagePath)
 			}
 		}(file)
 
