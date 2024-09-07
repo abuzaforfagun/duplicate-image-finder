@@ -15,17 +15,19 @@ import (
 )
 
 func main() {
+	if len(os.Args) != 2 {
+		log.Println("Please mention the folder name")
+	}
+	log.Println("Folder name: ", os.Args[1])
 	start := time.Now()
-	findDuplicateImageAsync()
-	// findDuplicateImageSync()
+	findDuplicateImageAsync(os.Args[1])
+	// findDuplicateImageSync(os.Args[1])
 	duration := time.Since(start)
 	log.Printf("IT takes %f seconds", duration.Seconds())
 }
 
-func findDuplicateImageAsync() {
-
-	dirName := "./images"
-	images, err := getImageFilesAsync(dirName)
+func findDuplicateImageAsync(folderPath string) {
+	images, err := getImageFilesAsync(folderPath)
 	if err != nil {
 		log.Panicf("%v", err)
 		return
@@ -40,7 +42,7 @@ func findDuplicateImageAsync() {
 		wg.Add(1)
 		go func(fileName *ImageFile) {
 			defer wg.Done()
-			file, err := os.Open(filepath.Join(dirName, filename.Name))
+			file, err := os.Open(filepath.Join(folderPath, filename.Name))
 			if err != nil {
 				log.Printf("Unable to open [filename=%s][Err=%v]\n", filename.Name, err)
 				return
@@ -68,6 +70,7 @@ func findDuplicateImageAsync() {
 			existingFile := filesMap[hash]
 			if existingFile != "" {
 				duplicatedFiles = append(duplicatedFiles, filename.Name)
+				duplicatedFiles = append(duplicatedFiles, existingFile)
 				mutex.Unlock()
 				return
 			}
@@ -81,9 +84,8 @@ func findDuplicateImageAsync() {
 	log.Println(duplicatedFiles)
 }
 
-func findDuplicateImageSync() {
-	dirName := "./images"
-	images, err := getImageFiles(dirName)
+func findDuplicateImageSync(folderPath string) {
+	images, err := getImageFiles(folderPath)
 	if err != nil {
 		log.Panicf("%v", err)
 		return
@@ -93,7 +95,7 @@ func findDuplicateImageSync() {
 	duplicatedFiles := []string{}
 
 	for _, filename := range images {
-		file, err := os.Open(filepath.Join(dirName, filename.Name))
+		file, err := os.Open(filepath.Join(folderPath, filename.Name))
 		if err != nil {
 			log.Printf("Unable to open [filename=%s][Err=%v]\n", filename.Name, err)
 			return
