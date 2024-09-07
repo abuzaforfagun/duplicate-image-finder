@@ -15,18 +15,24 @@ import (
 )
 
 func main() {
+	var folderPath string
 	if len(os.Args) != 2 {
-		log.Println("Please mention the folder name")
+		log.Println("Using current directory to find duplicate")
+		folderPath = "./"
+	} else {
+		folderPath = os.Args[1]
+
+		log.Printf("Using '%s' folder to find the duplicate\n", folderPath)
 	}
-	log.Println("Folder name: ", os.Args[1])
+
 	start := time.Now()
-	duplicatedFiles := findDuplicateImageAsync(os.Args[1])
+	duplicatedFiles := findDuplicateImageAsync(folderPath)
+
 	for _, file := range duplicatedFiles {
 		log.Println(file)
 	}
-	//duplicatedFiles :=  findDuplicateImageSync(os.Args[1])
 	duration := time.Since(start)
-	log.Printf("IT takes %f seconds", duration.Seconds())
+	log.Printf("IT takes %f seconds to find '%d' duplicate images\n", duration.Seconds(), len(duplicatedFiles))
 }
 
 func findDuplicateImageAsync(folderPath string) []string {
