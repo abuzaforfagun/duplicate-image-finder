@@ -166,39 +166,13 @@ func getImageFiles(dirPath string) ([]*ImageFile, error) {
 	return images, nil
 }
 
-func getImageFilesAsync(dirPath string) ([]*ImageFile, error) {
-	files, err := os.ReadDir(dirPath)
-
-	if err != nil {
-		log.Println("unable to retrieve files", err)
-		return nil, err
-	}
-
-	images := []*ImageFile{}
-	imageChan := make(chan *ImageFile)
+func getImageFilesAsync(rootDirPath string) ([]*ImageFile, error) {
 	var wg sync.WaitGroup
+	imageChan := make(chan *ImageFile)
+	images := []*ImageFile{}
 
-	for _, file := range files {
-		wg.Add(1)
-		go func(file os.DirEntry) {
-			defer wg.Done()
-			if file.IsDir() {
-				return
-			}
-
-			isJpgFile := strings.HasSuffix(file.Name(), "jpg") || strings.HasSuffix(file.Name(), "jpeg")
-			isPngFile := strings.HasSuffix(file.Name(), "png")
-			imagePath := filepath.Join(dirPath, file.Name())
-			if isJpgFile {
-				imageChan <- NewJpegImage(imagePath)
-			}
-
-			if isPngFile {
-				imageChan <- NewPngImage(imagePath)
-			}
-		}(file)
-
-	}
+	wg.Add(1)
+	go getImageFilesFromDir(rootDirPath, imageChan, &wg)
 
 	go func() {
 		wg.Wait()
@@ -210,4 +184,32 @@ func getImageFilesAsync(dirPath string) ([]*ImageFile, error) {
 	}
 
 	return images, nil
+}
+
+func getImageFilesFromDir(dirPath string, imageChan chan<- *ImageFile, wg *sync.WaitGroup) {
+	defer wg.Done()
+
+	files, err := os.ReadDir(dirPath)
+	if err != nil {
+		log.Println("Unable to retrieve files:", err)
+		return
+	}
+
+	for _, file := range files {
+		if file.IsDir() {
+			wg.Add(1)
+			go getImageFilesFromDir(filepath.Join(dirPath, file.Name()), imageChan, wg)
+			continue
+		}
+
+		isJpgFile := strings.HasSuffix(file.Name(), ".jpg") || strings.HasSuffix(file.Name(), ".jpeg")
+		isPngFile := strings.HasSuffix(file.Name(), ".png")
+		imagePath := filepath.Join(dirPath, file.Name())
+
+		if isJpgFile {
+			imageChan <- NewJpegImage(imagePath)
+		} else if isPngFile {
+			imageChan <- NewPngImage(imagePath)
+		}
+	}
 }
